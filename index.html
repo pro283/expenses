@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - LedgerSpace</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="logo"><i class="fa-solid fa-wallet"></i> LedgerSpace</div>
+        <a href="index.html" class="nav-item active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="ledger.html" class="nav-item"><i class="fa-solid fa-table-list"></i> Monthly Data</a>
+        <a href="profile.html" class="nav-item"><i class="fa-solid fa-user"></i> Profile</a>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Overview</h1>
+            <input type="month" id="month-selector" class="month-selector">
+        </div>
+        
+        <div class="kpi-grid">
+            <div class="card kpi-card">
+                <div class="kpi-title">Total Income</div>
+                <div class="kpi-value text-success" id="kpi-income">Rs: 0</div>
+            </div>
+            <div class="card kpi-card">
+                <div class="kpi-title">Total Expenses</div>
+                <div class="kpi-value text-danger" id="kpi-expenses">Rs: 0</div>
+            </div>
+            <div class="card kpi-card">
+                <div class="kpi-title">Net Savings</div>
+                <div class="kpi-value" id="kpi-savings">Rs: 0</div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 24px; height: 400px;">
+            <canvas id="financeChart"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, db, getStoredMonth, setStoredMonth, evaluateAmount } from './firebase-config.js';
+        import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        let currentMonth = getStoredMonth();
+        const monthInput = document.getElementById('month-selector');
+        monthInput.value = currentMonth;
+        let chartInstance = null;
+        let currentUser = null;
+
+        const sidebar = document.querySelector('.sidebar');
+        sidebar.innerHTML += `<a href="#" id="logout-btn" class="nav-item" style="margin-top: auto; color: var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>`;
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth).then(() => window.location.href = 'login.html');
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.replace('login.html');
+            } else {
+                currentUser = user;
+                loadDashboard();
+            }
+        });
+
+        monthInput.addEventListener('change', (e) => {
+            currentMonth = e.target.value;
+            setStoredMonth(currentMonth);
+            loadDashboard();
+        });
+
+        function loadDashboard() {
+            if(!currentUser) return;
+            onValue(ref(db, `users/${currentUser.uid}/months/${currentMonth}`), (snapshot) => {
+                const data = snapshot.val() || { income: {}, school: {}, utilities: {} };
+                let income = 0, expenses = 0, schoolTotal = 0, utilsTotal = 0;
+
+                if(data.income) Object.values(data.income).forEach(i => income += evaluateAmount(i.amount));
+                if(data.school) Object.values(data.school).forEach(i => {
+                    const amt = evaluateAmount(i.amount);
+                    expenses += amt;
+                    schoolTotal += amt;
+                });
+                if(data.utilities) Object.values(data.utilities).forEach(i => {
+                    const amt = evaluateAmount(i.amount);
+                    expenses += amt;
+                    utilsTotal += amt;
+                });
+
+                document.getElementById('kpi-income').innerText = `Rs: ${income.toLocaleString()}`;
+                document.getElementById('kpi-expenses').innerText = `Rs: ${expenses.toLocaleString()}`;
+                document.getElementById('kpi-savings').innerText = `Rs: ${(income - expenses).toLocaleString()}`;
+                
+                updateChart(income, expenses, schoolTotal, utilsTotal);
+            });
+        }
+
+        function updateChart(income, expenses, schoolTotal, utilsTotal) {
+            const ctx = document.getElementById('financeChart').getContext('2d');
+            const savings = Math.max(0, income - expenses);
+
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['School/Van Fees', 'Utility Bills', 'Savings'],
+                    datasets: [{
+                        data: [schoolTotal, utilsTotal, savings],
+                        backgroundColor: ['#F59E0B', '#EF4444', '#10B981'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    </script>
+</body>
+</html>
