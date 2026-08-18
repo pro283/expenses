@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Expense Tracker</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -19,7 +19,10 @@
       <button id="nextMonthBtn" class="btn btn-icon">→</button>
       <input type="month" id="monthPicker" class="month-picker">
     </div>
-    <button id="logoutBtn" class="btn btn-outline">Logout</button>
+    <div class="header-actions">
+      <a href="electricity.html" class="btn btn-secondary">⚡ Electricity Saver</a>
+      <button id="logoutBtn" class="btn btn-outline">Logout</button>
+    </div>
   </header>
 
   <main class="dashboard-main">
@@ -150,8 +153,8 @@
     </div>
   </div>
 
-  <script src="js/firebase-config.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="common.js"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>
