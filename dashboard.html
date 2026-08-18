@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Expense Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="dashboard-header">
+    <div class="logo">💰 Expense Tracker</div>
+    <div class="month-nav">
+      <button id="prevMonthBtn" class="btn btn-icon">←</button>
+      <span id="monthLabel" class="month-label"></span>
+      <button id="nextMonthBtn" class="btn btn-icon">→</button>
+      <input type="month" id="monthPicker" class="month-picker">
+    </div>
+    <button id="logoutBtn" class="btn btn-outline">Logout</button>
+  </header>
+
+  <main class="dashboard-main">
+    <div class="summary-cards">
+      <div class="card income-card">
+        <h3>Total Income</h3>
+        <p id="totalIncome">$0.00</p>
+      </div>
+      <div class="card expenses-card">
+        <h3>Total Expenses</h3>
+        <p id="totalExpenses">$0.00</p>
+      </div>
+      <div class="card savings-card">
+        <h3>Savings</h3>
+        <p id="totalSavings">$0.00</p>
+      </div>
+    </div>
+
+    <div class="charts-container">
+      <div class="chart-card">
+        <h3>Income vs Expenses vs Savings</h3>
+        <canvas id="summaryChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Expense Breakdown</h3>
+        <canvas id="expenseChart"></canvas>
+      </div>
+    </div>
+
+    <div class="data-sections">
+      <section class="data-section">
+        <div class="section-header">
+          <h2>Income Sources</h2>
+          <button class="btn btn-secondary btn-sm" id="addIncomeBtnDash">+ Add</button>
+        </div>
+        <ul id="incomeList" class="data-list"></ul>
+      </section>
+      <section class="data-section">
+        <div class="section-header">
+          <h2>Bill Expenses</h2>
+          <button class="btn btn-secondary btn-sm" id="addExpenseBtnDash">+ Add</button>
+        </div>
+        <ul id="expensesList" class="data-list"></ul>
+      </section>
+      <section class="data-section">
+        <div class="section-header">
+          <h2>Children</h2>
+          <button class="btn btn-secondary btn-sm" id="addChildBtnDash">+ Add</button>
+        </div>
+        <ul id="childrenList" class="data-list"></ul>
+      </section>
+    </div>
+
+    <div id="emptyState" style="display:none;" class="empty-state">
+      <p>No data for this month. Start adding your income, expenses, and children.</p>
+    </div>
+  </main>
+
+  <!-- Modals -->
+  <div id="incomeModal" class="modal">
+    <div class="modal-content">
+      <span class="close" data-modal="incomeModal">&times;</span>
+      <h2 id="incomeModalTitle">Add Income</h2>
+      <form id="incomeForm">
+        <input type="hidden" id="incomeId">
+        <div class="form-group">
+          <label for="incomeName">Source Name</label>
+          <input type="text" id="incomeName" required>
+        </div>
+        <div class="form-group">
+          <label for="incomeAmount">Amount</label>
+          <input type="number" id="incomeAmount" min="0" step="0.01" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="expenseModal" class="modal">
+    <div class="modal-content">
+      <span class="close" data-modal="expenseModal">&times;</span>
+      <h2 id="expenseModalTitle">Add Expense</h2>
+      <form id="expenseForm">
+        <input type="hidden" id="expenseId">
+        <div class="form-group">
+          <label for="expenseCategory">Category</label>
+          <input type="text" id="expenseCategory" required list="expenseCategoryList">
+          <datalist id="expenseCategoryList">
+            <option value="Petrol">
+            <option value="Gas">
+            <option value="Electricity">
+            <option value="Internet">
+            <option value="Grocery">
+            <option value="Water">
+            <option value="Phone Bill">
+            <option value="Other">
+          </datalist>
+        </div>
+        <div class="form-group">
+          <label for="expenseAmount">Amount</label>
+          <input type="number" id="expenseAmount" min="0" step="0.01" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="childModal" class="modal">
+    <div class="modal-content">
+      <span class="close" data-modal="childModal">&times;</span>
+      <h2 id="childModalTitle">Add Child</h2>
+      <form id="childForm">
+        <input type="hidden" id="childId">
+        <div class="form-group">
+          <label for="childName">Child Name</label>
+          <input type="text" id="childName" required>
+        </div>
+        <div class="form-group">
+          <label for="childSchoolFees">School Fees</label>
+          <input type="number" id="childSchoolFees" min="0" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <label for="childOtherExpenses">Other Expenses</label>
+          <input type="number" id="childOtherExpenses" min="0" step="0.01" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
