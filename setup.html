@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup - Expense Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="setup-container">
+    <div class="setup-header">
+      <h1>Let's set up your monthly budget</h1>
+      <div class="progress-bar">
+        <div class="progress-step active" data-step="1">1. Income</div>
+        <div class="progress-step" data-step="2">2. Bills</div>
+        <div class="progress-step" data-step="3">3. Children</div>
+        <div class="progress-step" data-step="4">4. Review</div>
+      </div>
+    </div>
+    <div class="setup-body">
+      <!-- Step 1: Income -->
+      <div class="step-content" id="step1">
+        <h2>Income Sources</h2>
+        <p>Add your monthly income sources. Click + to add more.</p>
+        <div id="incomeSourcesContainer">
+          <div class="income-row">
+            <input type="text" class="income-name" placeholder="Source name (e.g., Salary)" required>
+            <input type="number" class="income-amount" placeholder="Amount" min="0" step="0.01" required>
+            <button class="btn btn-remove" onclick="removeIncomeRow(this)">✕</button>
+          </div>
+        </div>
+        <button class="btn btn-secondary" id="addIncomeBtn">+ Add Income Source</button>
+        <div class="step-actions">
+          <button class="btn btn-primary" id="incomeNext">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Expenses -->
+      <div class="step-content" id="step2" style="display:none;">
+        <h2>Bill Expenses</h2>
+        <p>Select the bills you pay monthly and enter their amounts.</p>
+        <div id="expensesContainer"></div>
+        <button class="btn btn-secondary" id="addCustomCategoryBtn">+ Add Custom Category</button>
+        <div class="step-actions">
+          <button class="btn btn-secondary" id="expensesBack">Back</button>
+          <button class="btn btn-primary" id="expensesNext">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Children -->
+      <div class="step-content" id="step3" style="display:none;">
+        <h2>Children</h2>
+        <p>Do you have children? Their expenses will be included in your monthly budget.</p>
+        <div class="form-group">
+          <label><input type="radio" name="hasChildren" value="yes" id="hasChildrenYes"> Yes</label>
+          <label><input type="radio" name="hasChildren" value="no" id="hasChildrenNo" checked> No</label>
+        </div>
+        <div id="childrenDetails" style="display:none;">
+          <div class="form-group">
+            <label for="numChildren">Number of children:</label>
+            <input type="number" id="numChildren" min="1" max="10" value="1">
+          </div>
+          <div id="childrenContainer"></div>
+        </div>
+        <div class="step-actions">
+          <button class="btn btn-secondary" id="childrenBack">Back</button>
+          <button class="btn btn-primary" id="childrenNext">Next</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Review -->
+      <div class="step-content" id="step4" style="display:none;">
+        <h2>Review & Save</h2>
+        <div id="reviewSummary"></div>
+        <div class="step-actions">
+          <button class="btn btn-secondary" id="reviewBack">Back</button>
+          <button class="btn btn-primary" id="saveBtn">Save & Go to Dashboard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/setup.js"></script>
+</body>
+</html>
