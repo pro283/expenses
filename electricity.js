@@ -1,7 +1,22 @@
 let applianceChartInstance = null;
-let currentAppliances = [];
-let currentRate = 30; // PKR per kWh
-let currentDays = 30;
+let currentAppliances = [];   // Array of {id, name, watts, hoursPerDay, quantity}
+let currentRate = 30;        // PKR per kWh
+let currentDays = 30;        // days in month
+let dirty = false;           // track unsaved changes
+
+// Default appliance list (common items)
+const defaultAppliances = [
+  { id: 'light_bulb', name: 'Light Bulb', watts: 60, hoursPerDay: 5, quantity: 0 },
+  { id: 'fan', name: 'Fan', watts: 75, hoursPerDay: 10, quantity: 0 },
+  { id: 'ac', name: 'AC', watts: 1500, hoursPerDay: 8, quantity: 0 },
+  { id: 'fridge', name: 'Fridge', watts: 200, hoursPerDay: 12, quantity: 0 },
+  { id: 'computer', name: 'Computer', watts: 200, hoursPerDay: 6, quantity: 0 },
+  { id: 'exhaust_fan', name: 'Exhaust Fan', watts: 40, hoursPerDay: 4, quantity: 0 },
+  { id: 'tv', name: 'TV', watts: 100, hoursPerDay: 6, quantity: 0 },
+  { id: 'washing_machine', name: 'Washing Machine', watts: 500, hoursPerDay: 1, quantity: 0 },
+  { id: 'microwave', name: 'Microwave', watts: 1200, hoursPerDay: 0.5, quantity: 0 },
+  { id: 'iron', name: 'Iron', watts: 1000, hoursPerDay: 0.5, quantity: 0 }
+];
 
 document.addEventListener('DOMContentLoaded', () => {
   auth.onAuthStateChanged(user => {
@@ -18,20 +33,18 @@ function setupEventListeners() {
   document.getElementById('logoutBtn').addEventListener('click', () => {
     auth.signOut().then(() => window.location.href = 'index.html');
   });
-  
-  document.getElementById('applianceForm').addEventListener('submit', saveAppliance);
-  
-  document.getElementById('unitRate').addEventListener('change', (e) => {
+
+  document.getElementById('unitRate').addEventListener('input', (e) => {
     currentRate = parseFloat(e.target.value) || 0;
-    saveSettings();
     updateCalculations();
   });
-  
-  document.getElementById('daysInMonth').addEventListener('change', (e) => {
+
+  document.getElementById('daysInMonth').addEventListener('input', (e) => {
     currentDays = parseInt(e.target.value) || 30;
-    saveSettings();
     updateCalculations();
   });
+
+  document.getElementById('saveElectricityBtn').addEventListener('click', saveData);
 }
 
 function loadElectricityData(uid) {
@@ -39,133 +52,106 @@ function loadElectricityData(uid) {
   electricityRef.on('value', (snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
-      currentAppliances = data.appliances || [];
       currentRate = data.rate || 30;
       currentDays = data.days || 30;
-      document.getElementById('unitRate').value = currentRate;
-      document.getElementById('daysInMonth').value = currentDays;
+      // Merge with defaults to ensure all appliance types exist
+      currentAppliances = data.appliances || [];
+      // Fill missing default types
+      defaultAppliances.forEach(def => {
+        if (!currentAppliances.find(a => a.id === def.id)) {
+          currentAppliances.push({ ...def });
+        }
+      });
+      // Remove any custom appliances not in defaults? (keep them)
     } else {
-      currentAppliances = [];
+      currentAppliances = defaultAppliances.map(a => ({ ...a }));
       currentRate = 30;
       currentDays = 30;
-      document.getElementById('unitRate').value = currentRate;
-      document.getElementById('daysInMonth').value = currentDays;
     }
-    renderAppliances();
+    document.getElementById('unitRate').value = currentRate;
+    document.getElementById('daysInMonth').value = currentDays;
+    renderApplianceList();
     updateCalculations();
   });
 }
 
-function saveSettings() {
-  const user = auth.currentUser;
-  if (!user) return;
-  const electricityRef = database.ref(`users/${user.uid}/electricity`);
-  electricityRef.update({
-    rate: currentRate,
-    days: currentDays
-  }).catch(error => console.error('Error saving settings:', error));
-}
-
-function saveAppliance(e) {
-  e.preventDefault();
-  const user = auth.currentUser;
-  if (!user) return;
-  
-  const id = document.getElementById('applianceId').value;
-  const name = document.getElementById('applianceName').value.trim();
-  const watts = parseFloat(document.getElementById('applianceWatts').value);
-  const hours = parseFloat(document.getElementById('applianceHours').value);
-  
-  if (!name || isNaN(watts) || watts <= 0 || isNaN(hours) || hours <= 0) {
-    alert('Please fill all appliance fields correctly.');
-    return;
-  }
-  
-  const appliance = {
-    id: id || generateId(),
-    name,
-    watts,
-    hoursPerDay: hours
-  };
-  
-  const electricityRef = database.ref(`users/${user.uid}/electricity/appliances`);
-  electricityRef.once('value').then(snapshot => {
-    let appliances = snapshot.val() || [];
-    if (id) {
-      appliances = appliances.map(item => item.id === id ? appliance : item);
-    } else {
-      appliances.push(appliance);
-    }
-    return electricityRef.set(appliances);
-  }).then(() => {
-    document.getElementById('applianceForm').reset();
-    document.getElementById('applianceId').value = '';
-    document.getElementById('saveApplianceBtn').textContent = 'Add Appliance';
-  }).catch(error => {
-    console.error('Error saving appliance:', error);
-    alert('Failed to save appliance.');
-  });
-}
-
-function renderAppliances() {
-  const list = document.getElementById('applianceList');
-  list.innerHTML = '';
-  if (currentAppliances.length === 0) {
-    list.innerHTML = '<li class="data-item">No appliances added yet.</li>';
+function renderApplianceList() {
+  const container = document.getElementById('applianceListContainer');
+  container.innerHTML = '';
+  if (!currentAppliances.length) {
+    container.innerHTML = '<p>No appliances defined.</p>';
     return;
   }
   currentAppliances.forEach(app => {
-    const monthlyKwh = (app.watts * app.hoursPerDay * currentDays) / 1000;
-    const cost = monthlyKwh * currentRate;
-    const li = document.createElement('li');
-    li.className = 'data-item';
-    li.innerHTML = `
-      <span class="item-name">${app.name} (${app.watts}W, ${app.hoursPerDay}h/day)</span>
-      <span class="item-amount">${monthlyKwh.toFixed(2)} kWh / ${formatPKR(cost)}</span>
-      <span class="item-actions">
-        <button class="btn-icon" onclick="editAppliance('${app.id}')">✏️</button>
-        <button class="btn-icon" onclick="deleteAppliance('${app.id}')">🗑️</button>
-      </span>
+    const row = document.createElement('div');
+    row.className = 'appliance-row';
+    row.innerHTML = `
+      <div class="appliance-info">
+        <span class="appliance-name">${app.name}</span>
+      </div>
+      <div class="appliance-fields">
+        <label>Watts</label>
+        <input type="number" class="appliance-watts" value="${app.watts}" min="0" step="1" data-id="${app.id}">
+        <label>Hours/day</label>
+        <input type="number" class="appliance-hours" value="${app.hoursPerDay}" min="0" step="0.5" data-id="${app.id}">
+        <label>Quantity</label>
+        <input type="number" class="appliance-quantity" value="${app.quantity}" min="0" step="1" data-id="${app.id}">
+      </div>
     `;
-    list.appendChild(li);
+    container.appendChild(row);
+  });
+
+  // Attach input listeners to update local data and recalc
+  container.querySelectorAll('.appliance-watts, .appliance-hours, .appliance-quantity').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const id = e.target.dataset.id;
+      const app = currentAppliances.find(a => a.id === id);
+      if (!app) return;
+      const field = e.target.classList.contains('appliance-watts') ? 'watts' :
+                    e.target.classList.contains('appliance-hours') ? 'hoursPerDay' : 'quantity';
+      app[field] = parseFloat(e.target.value) || 0;
+      updateCalculations();
+    });
   });
 }
 
 function updateCalculations() {
-  const totalKwh = currentAppliances.reduce((sum, app) => sum + (app.watts * app.hoursPerDay * currentDays) / 1000, 0);
+  let totalKwh = 0;
+  let highest = null;
+  const breakdown = []; // For chart
+
+  currentAppliances.forEach(app => {
+    const kwh = (app.watts * app.hoursPerDay * app.quantity * currentDays) / 1000;
+    totalKwh += kwh;
+    breakdown.push({ name: app.name, kwh });
+    if (!highest || kwh > highest.kwh) {
+      highest = { name: app.name, kwh };
+    }
+  });
+
   const totalCost = totalKwh * currentRate;
-  
+
   document.getElementById('totalConsumption').textContent = totalKwh.toFixed(2) + ' kWh';
   document.getElementById('totalCost').textContent = formatPKR(totalCost);
-  
-  let highest = null;
-  if (currentAppliances.length > 0) {
-    highest = currentAppliances.reduce((max, app) => {
-      const kwh = (app.watts * app.hoursPerDay * currentDays) / 1000;
-      if (!max || kwh > max.kwh) return { name: app.name, kwh };
-      return max;
-    }, null);
-    document.getElementById('highestConsumer').textContent = highest ? `${highest.name} (${highest.kwh.toFixed(2)} kWh)` : '-';
-  } else {
-    document.getElementById('highestConsumer').textContent = '-';
-  }
-  
-  updateChart();
+  document.getElementById('highestConsumer').textContent = highest && highest.kwh > 0 ? `${highest.name} (${highest.kwh.toFixed(2)} kWh)` : '-';
+
+  updateChart(breakdown);
 }
 
-function updateChart() {
+function updateChart(breakdown) {
   const ctx = document.getElementById('applianceChart').getContext('2d');
   if (applianceChartInstance) applianceChartInstance.destroy();
-  
-  if (currentAppliances.length === 0) {
+
+  const labels = breakdown.map(b => b.name);
+  const data = breakdown.map(b => b.kwh);
+  const colors = generateDistinctColors(labels.length);
+
+  if (data.every(v => v === 0)) {
     applianceChartInstance = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: ['No Appliances'],
-        datasets: [{
-          data: [1],
-          backgroundColor: ['#e0e0e0']
-        }]
+        labels: ['No Consumption'],
+        datasets: [{ data: [1], backgroundColor: ['#e0e0e0'] }]
       },
       options: {
         responsive: true,
@@ -175,17 +161,15 @@ function updateChart() {
     });
     return;
   }
-  
-  const labels = currentAppliances.map(a => a.name);
-  const data = currentAppliances.map(a => (a.watts * a.hoursPerDay * currentDays) / 1000);
-  
+
   applianceChartInstance = new Chart(ctx, {
     type: 'pie',
     data: {
       labels,
       datasets: [{
         data,
-        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#8BC34A', '#E91E63', '#00BCD4']
+        backgroundColor: colors,
+        hoverOffset: 4
       }]
     },
     options: {
@@ -207,29 +191,30 @@ function updateChart() {
   });
 }
 
-function editAppliance(id) {
-  const app = currentAppliances.find(a => a.id === id);
-  if (!app) return;
-  document.getElementById('applianceId').value = app.id;
-  document.getElementById('applianceName').value = app.name;
-  document.getElementById('applianceWatts').value = app.watts;
-  document.getElementById('applianceHours').value = app.hoursPerDay;
-  document.getElementById('saveApplianceBtn').textContent = 'Update Appliance';
-  window.scrollTo(0, 0);
+// Generate distinct colors (reuse from dashboard, but we can copy here)
+function generateDistinctColors(count) {
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    const hue = Math.floor((i * 360) / count);
+    const saturation = 70 + (i % 3) * 10;
+    const lightness = 45 + (i % 3) * 10;
+    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+  }
+  return colors;
 }
 
-function deleteAppliance(id) {
-  if (!confirm('Delete this appliance?')) return;
+function saveData() {
   const user = auth.currentUser;
   if (!user) return;
-  const electricityRef = database.ref(`users/${user.uid}/electricity/appliances`);
-  electricityRef.once('value').then(snapshot => {
-    let appliances = snapshot.val() || [];
-    appliances = appliances.filter(item => item.id !== id);
-    return electricityRef.set(appliances);
-  }).catch(error => console.error(error));
+  const electricityRef = database.ref(`users/${user.uid}/electricity`);
+  electricityRef.set({
+    rate: currentRate,
+    days: currentDays,
+    appliances: currentAppliances
+  }).then(() => {
+    alert('Electricity data saved successfully!');
+  }).catch(error => {
+    console.error('Error saving electricity data:', error);
+    alert('Failed to save data.');
+  });
 }
-
-// Expose functions
-window.editAppliance = editAppliance;
-window.deleteAppliance = deleteAppliance;
