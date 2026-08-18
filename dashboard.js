@@ -151,6 +151,7 @@ function renderChildrenList() {
   list.innerHTML = '';
   if (currentMonthData && currentMonthData.children) {
     currentMonthData.children.forEach(item => {
+      // Combine school fees and other expenses into one total
       const childTotal = (item.schoolFees || 0) + (item.otherExpenses || 0);
       const li = document.createElement('li');
       li.className = 'data-item';
@@ -167,7 +168,21 @@ function renderChildrenList() {
   }
 }
 
+// Generate distinct colors using HSL
+function generateDistinctColors(count) {
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    const hue = Math.floor((i * 360) / count);
+    // Vary lightness and saturation slightly to avoid repetition
+    const saturation = 70 + (i % 3) * 10; // 70%, 80%, 90%
+    const lightness = 45 + (i % 3) * 10;  // 45%, 55%, 65%
+    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+  }
+  return colors;
+}
+
 function updateCharts(totalIncome, totalExpenses, savings) {
+  // Summary chart (bar) - unchanged
   const summaryCtx = document.getElementById('summaryChart').getContext('2d');
   if (summaryChartInstance) summaryChartInstance.destroy();
   summaryChartInstance = new Chart(summaryCtx, {
@@ -195,25 +210,36 @@ function updateCharts(totalIncome, totalExpenses, savings) {
     }
   });
   
+  // Expense breakdown chart (doughnut) - updated to combine child expenses and use distinct colors
   const expenseCtx = document.getElementById('expenseChart').getContext('2d');
   if (expenseChartInstance) expenseChartInstance.destroy();
   
   let expenseLabels = [];
   let expenseData = [];
+  
+  // Aggregate regular expenses
   if (currentMonthData && currentMonthData.expenses) {
     const catMap = {};
     currentMonthData.expenses.forEach(exp => {
       catMap[exp.category] = (catMap[exp.category] || 0) + exp.amount;
     });
-    if (currentMonthData.children) {
-      currentMonthData.children.forEach(child => {
-        if (child.schoolFees) catMap[`School Fees - ${child.name}`] = (catMap[`School Fees - ${child.name}`] || 0) + child.schoolFees;
-        if (child.otherExpenses) catMap[`Other - ${child.name}`] = (catMap[`Other - ${child.name}`] || 0) + child.otherExpenses;
-      });
-    }
     expenseLabels = Object.keys(catMap);
     expenseData = Object.values(catMap);
   }
+  
+  // Combine child expenses: one category per child with total
+  if (currentMonthData && currentMonthData.children && currentMonthData.children.length > 0) {
+    currentMonthData.children.forEach(child => {
+      const childTotal = (child.schoolFees || 0) + (child.otherExpenses || 0);
+      if (childTotal > 0) {
+        expenseLabels.push(child.name);
+        expenseData.push(childTotal);
+      }
+    });
+  }
+  
+  // Generate distinct colors for all categories
+  const colors = generateDistinctColors(expenseLabels.length);
   
   if (expenseLabels.length > 0) {
     expenseChartInstance = new Chart(expenseCtx, {
@@ -222,7 +248,8 @@ function updateCharts(totalIncome, totalExpenses, savings) {
         labels: expenseLabels,
         datasets: [{
           data: expenseData,
-          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF']
+          backgroundColor: colors,
+          hoverOffset: 4
         }]
       },
       options: {
@@ -230,12 +257,25 @@ function updateCharts(totalIncome, totalExpenses, savings) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'right'
+            position: 'right',
+            labels: {
+              boxWidth: 15,
+              padding: 10
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                return `${context.label}: ${formatCurrency(value)}`;
+              }
+            }
           }
         }
       }
     });
   } else {
+    // No data, show empty state
     expenseChartInstance = new Chart(expenseCtx, {
       type: 'doughnut',
       data: {
@@ -249,9 +289,7 @@ function updateCharts(totalIncome, totalExpenses, savings) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            display: false
-          }
+          legend: { display: false }
         }
       }
     });
